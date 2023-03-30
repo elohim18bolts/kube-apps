@@ -1,0 +1,16 @@
+{{- if .Values.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "jellyfin.fullname" . }}
+spec:
+  accessModes:
+    {{- range .Values.storage.pvc.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  volumeMode: {{ .Values.storage.pvc.volumeMode }}
+  storageClassName: {{ .Values.storage.pvc.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.pvc.storage }}
+{{- end }}

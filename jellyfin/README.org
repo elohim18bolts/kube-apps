@@ -1,0 +1,145 @@
+#+title: Jellyfin
+
+* Intel Quick Sync-VAApi
+Intel quick sync helps decode video streams using hardware accelerator. This will take load off the cpu reducing cpu load and resources consumption.
+
+To enable intel quick sync( or va api in linux ) follow these steps:
+
+** Intel Device Operator
+Install intell device operator, this will manage all the intel device plugins that you install in the cluster(including the intel gpu plugin) in a centralized way, making easier for updates and logs.
+#+begin_src bash
+#Using individual yaml files
+kubectl apply -k 'https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/nfd?ref=<RELEASE_VERSION>'
+#+end_src
+For RELEASE_VERSION number see [[https://github.com/intel/intel-device-plugins-for-kubernetes/tags][release tags]].
+
+Make sure both NFD master and worker pods are running:
+#+begin_src bash
+kubectl get pods -n node-feature-discovery
+NAME                          READY   STATUS    RESTARTS   AGE
+nfd-master-599c58dffc-9wql4   1/1     Running   0          25h
+nfd-worker-qqq4h              1/1     Running   0          25h
+#+end_src
+/Note/: Labelling is not performed immediately. Give NFD 1 minute to pick up the rules and label nodes.
+
+Check all node collected labels run:
+#+begin_src bash
+kubectl get no -o json | jq .items[].metadata.labels
+{
+  "beta.kubernetes.io/arch": "amd64",
+  "beta.kubernetes.io/os": "linux",
+  "feature.node.kubernetes.io/cpu-cpuid.AESNI": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.AVX": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.AVXSLOW": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.CMPXCHG8": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.FXSR": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.FXSROPT": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.HYPERVISOR": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.IBPB": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.LAHF": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.MD_CLEAR": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.OSXSAVE": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.SPEC_CTRL_SSBD": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.STIBP": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.SYSCALL": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.SYSEE": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.X87": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.XSAVE": "true",
+  "feature.node.kubernetes.io/cpu-cpuid.XSAVEOPT": "true",
+  "feature.node.kubernetes.io/cpu-hardware_multithreading": "false",
+  "feature.node.kubernetes.io/cpu-model.family": "6",
+  "feature.node.kubernetes.io/cpu-model.id": "42",
+  "feature.node.kubernetes.io/cpu-model.vendor_id": "Intel",
+  "feature.node.kubernetes.io/kernel-config.NO_HZ": "true",
+  "feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE": "true",
+  "feature.node.kubernetes.io/kernel-version.full": "5.4.0-131-generic",
+  "feature.node.kubernetes.io/kernel-version.major": "5",
+  "feature.node.kubernetes.io/kernel-version.minor": "4",
+  "feature.node.kubernetes.io/kernel-version.revision": "0",
+  "feature.node.kubernetes.io/pci-0300_1234.present": "true",
+  "feature.node.kubernetes.io/system-os_release.ID": "ubuntu",
+  "feature.node.kubernetes.io/system-os_release.VERSION_ID": "20.04",
+  "feature.node.kubernetes.io/system-os_release.VERSION_ID.major": "20",
+  "feature.node.kubernetes.io/system-os_release.VERSION_ID.minor": "04",
+  "kubernetes.io/arch": "amd64",
+  "kubernetes.io/hostname": "controlplane",
+  "kubernetes.io/os": "linux",
+  "node-role.kubernetes.io/control-plane": "",
+  "node.kubernetes.io/exclude-from-external-load-balancers": ""
+}
+#+end_src
+
+/Note:/ Check the device plugin label selector because you will need this to label the nodes you want to present such device to the pods.
+
+E.g: For intel gpu device plugin the label used is =intel.feature.node.kubernetes.io/gpu: "true"=.
+
+The default operator deployment depends on *cert-manager* running in the cluster. See installation instructions [[https://cert-manager.io/docs/installation/kubectl/][here]].
+
+Make sure all the pods in the =cert-manager= namespace are up and running:
+#+begin_src bash
+kubectl get pods -n cert-manager
+NAME                                      READY   STATUS    RESTARTS   AGE
+cert-manager-7747db9d88-bd2nl             1/1     Running   0          1d
+cert-manager-cainjector-87c85c6ff-59sb5   1/1     Running   0          1d
+cert-manager-webhook-64dc9fff44-29cfc     1/1     Running   0          1d
+#+end_src
+
+Finally deploy the operator itself:
+
+#+begin_src bash
+#Create the intel-system namespace
+kubectl create ns intel-system
+#Apply deployment in the intel-system namespace
+kubectl apply -k 'https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/operator/default?ref=<RELEASE_VERSION>' -n intel-system
+#+end_src
+
+Now you can deploy the device plugins by creating corresponding custom resources. The samples for them are available [[https://github.com/intel/intel-device-plugins-for-kubernetes/tree/340babb49b05b45ebacfb61c565ee06fb5e49ae8/deployments/operator/samples/][here]].
+
+/Note:/ It can be the when we execute the code above the operator pod will be in a =CrashLoopBackOff=, and the logs will show that the pod can not mount the =default= service account in that namespace. This is due to =automountServiceAccountToken: false= inside the service account.
+
+To solve this run:
+#+begin_src bash
+kubectl edit serviceaccount -n intel-system
+#Then edit automountServiceAccountToken: false to true
+#+end_src
+
+After changing =automountServiceAccountToken: true= restart the pod: =kubectl delete pod <operator pod name>=
+
+This will create a new pod with a =ready= status and no errors.
+
+
+
+** Intel GPU Device Plugin
+After we have install the =intel operator= then we must install the =GpuDevicePlugin= to see the gpu device inside the pods in the specific node.
+#+begin_src bash
+kubectl apply -f https://raw.githubusercontent.com/intel/intel-device-plugins-for-kubernetes/main/deployments/operator/samples/deviceplugin_v1_gpudeviceplugin.yaml
+#+end_src
+
+Remember to label the nodes that you want to use the gpu device plugin:
+#+begin_src bash
+kubectl label node <node name> intel.feature.node.kubernetes.io/gpu: "true"
+#+end_src
+
+Observe it is up and running:
+#+begin_src bash
+kubectl get GpuDevicePlugin
+NAME                     DESIRED   READY   NODE SELECTOR   AGE
+gpudeviceplugin-sample   1         1                       5s
+#+end_src
+
+** Enable GuC / HuC firmware loading
+Starting with Gen9 (Skylake and onwards), Intel GPUs include a Graphics micro (μ) Controller (GuC) which provides the following functionality:
+
+- Offloading some media decoding functionality from the CPU to the =HEVC/H.265= micro (µ) Controller (HuC). Only applicable if using intel-media-driver for hardware video acceleration. Introduced with Gen9.
+- Using the GuC for scheduling, context submission, and power management. Introduced with Alder Lake-P (Mobile), within Gen12.
+
+To use this functionality, the GuC firmware must be loaded. With regards to HuC support, some video features (e.g. CBR rate control on SKL low-power encoding mode) require loading the HuC firmware as well [4]. The GuC and HuC firmware files are both provided by linux-firmware.
+
+First, ensure that linux-firmware is installed.
+Check that early KMS is enabled, then set these options through a file in /etc/modprobe.d/, e.g.:
+#+begin_src bash
+echo "options i915 enable_guc=2" | tee /etc/modprobe.d/i915.conf
+#+end_src
+And then [[https://wiki.archlinux.org/title/Mkinitcpio#Manual_generation][rebuild your initramfs]].
+
+/Note:/ For more information follow this [[https://wiki.archlinux.org/title/intel_graphics#Enable_GuC_/_HuC_firmware_loading][guide]]
