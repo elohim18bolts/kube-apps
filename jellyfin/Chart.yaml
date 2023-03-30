@@ -22,3 +22,19 @@ version: 0.1.0
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "10.8.9"
+
+home: https://jellyfin.org
+keywords:
+  - jellyfin
+  - media-server
+  - streaming
+  - tv
+  - video
+  - kodi
+  annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/changes: |
+    - "Update to version 10.8.9"
+  artifacthub.io/images: |
+    - name: linuxserver/jellyfin
+      image: lscr.io/linuxserver/jellyfin:10.8.9
