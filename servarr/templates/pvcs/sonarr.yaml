@@ -1,0 +1,25 @@
+---
+{{- if .Values.sonarr.storage.enabled }}
+{{- $namespace := (include "servarr.namespace" .) | replace "namespace: " "" }}
+{{- range .Values.sonarr.storage.volumes }}
+{{- if .spec.persistentVolumeClaim -}}
+{{- $claimName := .spec.persistentVolumeClaim.claimName }}
+{{- $modes := .accessModes -}}
+{{- $capacity := .capacity -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+  namespace: {{ $namespace }}
+spec:
+  accessModes:
+  {{- range $mode := $modes }}
+  - {{ $mode }}
+  {{- end}}
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: {{ $capacity }}
+{{- end }}        
+{{- end }}
+{{- end }}

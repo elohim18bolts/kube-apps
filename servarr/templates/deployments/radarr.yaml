@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "servarr.radarr.fullname" . }}
+  labels:
+    {{- include "servarr.radarr.labels" . | nindent 4 }}
+  {{- include "servarr.namespace" . | nindent 2 }}
+spec:
+  {{- if not .Values.radarr.autoscaling.enabled }}
+  replicas: {{ .Values.radarr.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "servarr.radarr.matchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.radarr.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "servarr.radarr.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "servarr.radarr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.radarr.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ template "servarr.name" . }}-{{ .Values.radarr.name }}
+          securityContext:
+            {{- toYaml .Values.radarr.securityContext | nindent 12 }}
+          image: "{{ .Values.radarr.image.repository }}:{{ .Values.radarr.image.tag }}"
+          imagePullPolicy: {{ .Values.radarr.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.environment }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 7878
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.radarr.resources | nindent 12 }}
+          {{- if .Values.radarr.storage.enabled }}
+          volumeMounts:
+          {{- with .Values.radarr.storage.volumes }}
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+      {{- if .Values.radarr.storage.enabled }}
+      volumes:
+        {{- with .Values.radarr.storage.volumes }}
+        {{- range . }}
+        - name: {{ .name }}
+          {{- toYaml .spec | nindent 10 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.radarr.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.radarr.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.radarr.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

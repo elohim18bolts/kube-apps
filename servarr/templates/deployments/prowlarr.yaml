@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "servarr.prowlarr.fullname" . }}
+  labels:
+    {{- include "servarr.prowlarr.labels" . | nindent 4 }}
+  {{- include "servarr.namespace" . | nindent 2 }}
+spec:
+  {{- if not .Values.prowlarr.autoscaling.enabled }}
+  replicas: {{ .Values.prowlarr.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "servarr.prowlarr.matchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.prowlarr.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "servarr.prowlarr.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "servarr.prowlarr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.prowlarr.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ template "servarr.name" . }}-{{ .Values.prowlarr.name }}
+          securityContext:
+            {{- toYaml .Values.prowlarr.securityContext | nindent 12 }}
+          image: "{{ .Values.prowlarr.image.repository }}:{{ .Values.prowlarr.image.tag }}"
+          imagePullPolicy: {{ .Values.prowlarr.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.environment }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.prowlarr.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.prowlarr.resources | nindent 12 }}
+          {{- if .Values.prowlarr.storage.enabled }}
+          volumeMounts:
+          {{- with .Values.prowlarr.storage.volumes }}
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+      {{- if .Values.prowlarr.storage.enabled }}
+      volumes:
+        {{- with .Values.prowlarr.storage.volumes }}
+        {{- range . }}
+        - name: {{ .name }}
+          {{- toYaml .spec | nindent 10 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.prowlarr.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.prowlarr.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.prowlarr.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

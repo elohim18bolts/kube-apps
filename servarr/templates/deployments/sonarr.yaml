@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "servarr.sonarr.fullname" . }}
+  labels:
+    {{- include "servarr.sonarr.labels" . | nindent 4 }}
+  {{- include "servarr.namespace" . | nindent 2 }}
+spec:
+  {{- if not .Values.sonarr.autoscaling.enabled }}
+  replicas: {{ .Values.sonarr.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "servarr.sonarr.matchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.sonarr.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "servarr.sonarr.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "servarr.sonarr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.sonarr.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ template "servarr.name" . }}-{{ .Values.sonarr.name }}
+          securityContext:
+            {{- toYaml .Values.sonarr.securityContext | nindent 12 }}
+          image: "{{ .Values.sonarr.image.repository }}:{{ .Values.sonarr.image.tag }}"
+          imagePullPolicy: {{ .Values.sonarr.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.environment }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.sonarr.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.sonarr.resources | nindent 12 }}
+          {{- if .Values.sonarr.storage.enabled }}
+          volumeMounts:
+          {{- with .Values.sonarr.storage.volumes }}
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+      {{- if .Values.sonarr.storage.enabled }}
+      volumes:
+        {{- with .Values.sonarr.storage.volumes }}
+        {{- range . }}
+        - name: {{ .name }}
+          {{- toYaml .spec | nindent 10 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.sonarr.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sonarr.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sonarr.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
