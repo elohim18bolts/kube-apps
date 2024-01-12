@@ -26,6 +26,15 @@ storage:
     volumeMode: Filesystem
     storage: 8Gi
 
+  volumes: 
+    - name: media
+      mountPath: /media
+      spec:
+        #To allow write permission to the files set the security context of the fsGroup.
+        nfs:
+          server: <SERVER-IP>
+          path: <FILEPATH>
+            
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
