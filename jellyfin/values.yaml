@@ -15,6 +15,7 @@ env:
   PUID: "1000"
   PGID: "1000"
   TZ: "America/New_York"
+  NVIDIA_VISIBLE_DEVICES: "all"
 
 storage:
   enabled: true
@@ -98,6 +99,12 @@ resources: {}
 # requests:
 #   cpu: 100m
 #   memory: 128Mi
+gpu:
+  enabled: true
+  gpuKind: "nvidia"
+  resources:
+    limits:
+      nvidia.com/gpu: "1"
 
 autoscaling:
   enabled: false

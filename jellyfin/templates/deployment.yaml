@@ -20,6 +20,9 @@ spec:
       labels:
         {{- include "jellyfin.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if and .Values.gpu.enabled  (eq .Values.gpu.gpuKind "nvidia") }}
+      runtimeClassName: nvidia
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -70,17 +73,15 @@ spec:
             - name: PGID
               value: {{ .Values.env.PGID | quote }}
             - name: TZ
-              value: {{ .Values.env.TZ }}
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
+              value: {{ .Values.env.TZ | quote }}
+
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.resources }}
+          {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.gpu.enabled }}
+          {{- toYaml .Values.gpu.resources | nindent 12 }}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
